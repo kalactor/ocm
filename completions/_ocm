@@ -1,0 +1,87 @@
+#compdef ocm
+
+_ocm() {
+  local -a commands providers
+  commands=(
+    'list:List providers, key modes, models, and defaults'
+    'add:Add a provider (openrouter, openai-compatible, local)'
+    'remove:Remove provider config and credentials'
+    'key:Set or switch key storage mode'
+    'models:Fetch /models and add selected models'
+    'default:Set model and small_model'
+    'disable:Add providers to disabled_providers'
+    'enable:Remove providers from disabled_providers'
+    'test:GET /models and report HTTP status'
+    'validate:Validate config against schema'
+    'backup:Create or list backups'
+    'restore:Restore a backup'
+    'doctor:Check paths, permissions, schema, duplicates, git safety'
+    'completion:Print bash or zsh completion'
+  )
+
+  _arguments -C \
+    '1:command:->command' \
+    '*::arg:->args' \
+    '--config[Use a specific config file]:file:_files' \
+    '--auth[Use a specific auth.json]:file:_files' \
+    '--project[Use project config]' \
+    '--dry-run[Print a diff and write nothing]' \
+    '(-y --yes)'{-y,--yes}'[Skip confirmation prompts]' \
+    '--json[Machine-readable output]'
+
+  case $state in
+    command)
+      _describe 'command' commands
+      ;;
+    args)
+      case $words[1] in
+        add)
+          _values 'preset' openrouter openai-compatible local
+          ;;
+        models)
+          providers=(${(f)"$(ocm list --json 2>/dev/null | grep -o '\"id\": *\"[^\"]*\"' | cut -d'\"' -f4)"})
+          _arguments \
+            '1:provider:($providers)' \
+            '--models[Comma-separated model ids]:ids:' \
+            '--all[Select every returned model]' \
+            '--select-all[Select every returned model]' \
+            '--deselect-all[Select no models]' \
+            '--force[Update names of already configured models]' \
+            '--timeout[Request timeout in milliseconds]:ms:'
+          ;;
+        key)
+          providers=(${(f)"$(ocm list --json 2>/dev/null | grep -o '\"id\": *\"[^\"]*\"' | cut -d'\"' -f4)"})
+          _arguments \
+            '1:provider:($providers)' \
+            '--mode[Key storage mode]:mode:(auth env file inline)' \
+            '--env-var[Environment variable name]:var:' \
+            '--file[Key file path]:file:_files' \
+            '--key-stdin[Read the key from stdin]' \
+            '--key-file[Read the key from a file]:file:_files' \
+            '--force[Overwrite an existing key]' \
+            '--add-to-gitignore[Add the key file to .gitignore]' \
+            '--no-chmod-config[Do not chmod the config to 600]'
+          ;;
+        remove)
+          providers=(${(f)"$(ocm list --json 2>/dev/null | grep -o '\"id\": *\"[^\"]*\"' | cut -d'\"' -f4)"})
+          _describe 'provider' providers
+          ;;
+        test)
+          providers=(${(f)"$(ocm list --json 2>/dev/null | grep -o '\"id\": *\"[^\"]*\"' | cut -d'\"' -f4)"})
+          _arguments \
+            '1:provider:($providers)' \
+            '--timeout[Request timeout in milliseconds]:ms:'
+          ;;
+        backup|restore)
+          _arguments \
+            '--target[config or auth]:target:(config auth)' \
+            '--list[List backups]' \
+            '--latest[Newest backup]' \
+            '--file[Exact backup filename]:file:_files'
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_ocm "$@"
